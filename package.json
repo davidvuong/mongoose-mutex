@@ -1,0 +1,29 @@
+{
+  "name": "mongoose-mutex",
+  "version": "0.0.1",
+  "description": "Easily acquire arbitrary mutual exclusions via your mongoose connections. They're logical mutexes, not object locks.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo No tests thus far"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bilalakil/mongoose-mutex.git/"
+  },
+  "keywords": [
+    "mongoose",
+    "mutex",
+    "lock"
+  ],
+  "author": {
+    "name": "Bilal Akil",
+    "email": "mail@bilalakil.me",
+    "url": "http://www.bilalakil.me/"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/bilalakil/mongoose-mutex/issues/"
+  },
+  "dependencies": {
+  }
+}
