@@ -24,6 +24,13 @@
   "bugs": {
     "url": "https://github.com/bilalakil/mongoose-mutex/issues/"
   },
+  "devDependencies": {
+    "mocha": "^2.2.1",
+    "mongoose": "^4.0.1",
+    "should": "^5.2.0"
+  },
   "dependencies": {
+    "lodash": "^3.6.0",
+    "rsvp": "^3.0.18"
   }
 }
