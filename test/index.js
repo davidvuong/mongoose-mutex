@@ -10,10 +10,16 @@ mongoose.connect('mongodb://localhost/test');
 
 describe('MongooseMutex', function() {
     beforeEach(function(done) {
+        var total = Object.keys(mongoose.connection.collections).length;
+        if(total === 0) return done();
+
+        var removed = 0;
         for(var i in mongoose.connection.collections) {
-            mongoose.connection.collections[i].remove(function() {});
+            mongoose.connection.collections[i].remove(function() {
+                if(++removed === total)
+                    done();
+            });
         }
-        done();
     });
     
     describe('construction', function() {
