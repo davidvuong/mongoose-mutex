@@ -10,16 +10,10 @@ var m = {
     // but we've tested everything we need to so we don't want to see these errors)
     nothing: function() {},
     
-    // Only forward on assertion errors - ignore connection errors
-    assertsOnly: function(err) {
-        if(isAssertionError(err))
-            throw err;
-    },
-    
-    // If the error is an assertion error, forward that. Otherwise assume it's a
-    // connection error and provide a more appropriate description (since the
-    // one from the error on it's own may be confusing and useless)
-    connError: function(err) {
+    // If the error is an assertion error, forward that. Otherwise provide an extra
+    // description for the error since the one from the error on it's own may be
+    // confusing without context
+    allErrors: function(err) {
         if(isAssertionError(err))
             throw err;
         
