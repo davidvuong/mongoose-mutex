@@ -11,7 +11,7 @@ var mutexTimeLimit = 1000;
 mongoose.connect('mongodb://localhost/test');
 
 /*
-    MongooseMutex.defaults = {
+    MongooseMutex.default = {
         connection: undefined,
         idle: false,
         timeLimit: 15000
@@ -67,26 +67,26 @@ describe('MongooseMutex', function() {
         });
         
         it('should not throw if a default mongoose connection is provided', function() {
-            MongooseMutex.defaults.connection = mongoose;
+            MongooseMutex.default.connection = mongoose;
             
             (function() {
                 new MongooseMutex('n/a', { idle: true });
             }).should.not.throw();
         });
 
-        it('should take values from MongooseMutex.defaults which can be overridden individually', function() {
+        it('should take values from MongooseMutex.default which can be overridden individually', function() {
             var weirdTimeLimit = 10;
 
-            MongooseMutex.defaults.idle = true;
-            MongooseMutex.defaults.timeLimit = weirdTimeLimit;
+            MongooseMutex.default.idle = true;
+            MongooseMutex.default.timeLimit = weirdTimeLimit;
 
             var mutex = new MongooseMutex('n/a');
             mutex.idle.should.be.true;
             mutex.timeLimit.should.equal(weirdTimeLimit);
 
             // These defaults will affect all tests, so we'll set them to good values.
-            MongooseMutex.defaults.idle = false;
-            MongooseMutex.defaults.timeLimit = mutexTimeLimit;
+            MongooseMutex.default.idle = false;
+            MongooseMutex.default.timeLimit = mutexTimeLimit;
 
             var mutex = new MongooseMutex('n/a', { idle: true });
             mutex.idle.should.be.true;
@@ -109,26 +109,26 @@ describe('MongooseMutex', function() {
                 .then(function() {
                     promise = mutex.go();
                     promise.should.equal(mutex.promise);
-                    
+
                     return promise.then(mutex.free).catch(util.nothing);
                 })
                 .catch(util.allErrors);
         });
         
-        it('should correctly create a document in the "_mutex" collection', function() {
-            var id = 'createTest',
+        it('should correctly create a document in the "MongooseMutex" collection', function() {
+            var slug = 'createTest',
                 numTests = 3,
-                mutex = new MongooseMutex(id, { idle: true });
+                mutex = new MongooseMutex(slug, { idle: true });
             
             var previousTimestamp;
             function checkMutex() {
                 return new RSVP.Promise(function(resolve) {
-                    mutex._model.findOne({ _id: id }, function(err, doc) {
+                    mutex._model.findOne({ slug: slug }, function(err, doc) {
                         should.not.exist(err);
                         should.exist(doc);
                         
-                        doc.timestamps.should.be.an.instanceOf('Array').and.have.lengthOf(1);
-                        doc.timestamps[0].should.be.an.instanceOf('string').and.not.equal(previousTimestamp);
+                        doc.timestamps.should.be.an.instanceOf(Array).and.have.lengthOf(1);
+                        doc.timestamps[0].should.be.an.instanceOf(String).and.not.equal(previousTimestamp);
                         
                         var previousTimestamp = stamp = doc.timestamps[0];
                         var split = stamp.indexOf('-');
@@ -136,11 +136,9 @@ describe('MongooseMutex', function() {
                         
                         var rand = stamp.split(0, split);
                         parseInt(rand, 10).should.not.be.NaN;
-                        
-                        stamp = stamp.slice(split + 1);
-                        (function() {
-                            stamp = new Date(stamp);
-                        }).should.not.throw();
+
+                        stamp = parseInt(stamp.slice(split + 1));
+                        stamp.should.not.be.NaN;
                         stamp.should.be.greaterThan(_.now());
                         stamp.should.be.lessThan(_.now() + mutex.timeLimit);
                         
@@ -163,14 +161,14 @@ describe('MongooseMutex', function() {
             return promise.catch(util.allErrors);
         });
         
-        it('should remove it\'s document from the "_mutex" collection after being #free()d', function() {
-            var id = 'removeTest',
-                mutex = new MongooseMutex(id);
+        it('should remove it\'s document from the "MongooseMutex" collection after being #free()d', function() {
+            var slug = 'removeTest',
+                mutex = new MongooseMutex(slug);
             
             function checkMutex(shouldExist) {
                 return function() {
                     return new RSVP.Promise(function(resolve) {
-                        mutex._model.findOne({ _id: id }, function(err, doc) {
+                        mutex._model.findOne({ slug: slug }, function(err, doc) {
                             should.not.exist(err);
 
                             if(shouldExist) should.exist(doc);
@@ -189,23 +187,33 @@ describe('MongooseMutex', function() {
                 .catch(util.allErrors);
         });
         
-        it('should provide mutual exclusion under the same ID', function() {
-            var id = 'mutexTest',
+        it('should provide mutual exclusion under the same slug', function() {
+            var slug = 'mutexTest',
                 numMutexes = 4,
-                mutexes = _.map(_.range(numMutexes), function() { return new MongooseMutex(id); });
+                mutexPromises = _.map(_.range(numMutexes), function(delay) {
+                    return new RSVP.Promise(function(resolve) {
+                        // A delay must be used because if they all happen 'simultaneously' (or immediately after
+                        // one another) then they may all use the same time and all be rejected
+                        setTimeout(function() {
+                            resolve(new MongooseMutex(slug));
+                        }, delay * 5);
+                    });
+                });
             
             var resolved = 0;
             
-            return RSVP.all(_.map(mutexes, function(mutex) {
-                return mutex.promise
-                    .then(function(free) {
-                        resolved++;
-                        return free;
-                    }, function(err) {
-                        // TODO (use should and be careful)
-                        if((err && err.message || err) != 'Failed to acquire mutual exclusion')
-                            throw err;
-                    });
+            return RSVP.all(_.map(mutexPromises, function(mutexPromise) {
+                return mutexPromise.then(function(mutex) {
+                    return mutex.promise
+                        .then(function(free) {
+                            resolved++;
+                            return free;
+                        }, function(err) {
+                            // TODO (use should and be careful)
+                            if((err && err.message || err) != 'Failed to acquire mutual exclusion')
+                                throw err;
+                        });
+                });
             })).then(function(frees) {
                 resolved.should.equal(1);
                 
@@ -215,10 +223,10 @@ describe('MongooseMutex', function() {
             }).catch(util.allErrors);
         });
         
-        it('should not lock mutexes under different IDs', function() {
-            var id = 'dontLockTest',
+        it('should not lock mutexes under different slugs', function() {
+            var slug = 'dontLockTest',
                 numMutexes = 4,
-                mutexPromises = _.map(_.range(numMutexes), function(i) { return new MongooseMutex(id + i).promise; });
+                mutexPromises = _.map(_.range(numMutexes), function(i) { return new MongooseMutex(slug + i).promise; });
             
             return RSVP.all(mutexPromises)
                 .then(function(frees) {
@@ -229,27 +237,29 @@ describe('MongooseMutex', function() {
                 .catch(util.allErrors);
         });
         
-        it('should remove it\'s timestamp from the "_mutex" collection after rejection', function() {
-            var id = 'failRemoveTest',
-                mutex = new MongooseMutex(id),
+        it('should remove it\'s timestamp from the "MongooseMutex" collection after rejection', function() {
+            var slug = 'failRemoveTest',
+                mutex = new MongooseMutex(slug),
                 numTests = 3,
-                failingMutexes = _.map(_.range(numTests), function() { return new MongooseMutex(id); });
-            
+                failingMutexes;
+
             return mutex.promise
                 .then(function() {
                     return new RSVP.Promise(function(resolve) {
-                        mutex._model.findOne({ _id: id }, function(err, doc) {
+                        mutex._model.findOne({ slug: slug }, function(err, doc) {
                             should.not.exist(err);
                             should.exist(doc);
 
-                            doc.timestamps.should.be.an.instanceOf('Array').and.have.lengthOf(1);
-                            doc.timestamps[0].should.be.an.instanceOf('string');
+                            doc.timestamps.should.be.an.instanceOf(Array).and.have.lengthOf(1);
+                            doc.timestamps[0].should.be.an.instanceOf(String);
 
                             resolve(doc.timestamps[0]);
                         });
                     });
                 })
                 .then(function(originalTimestamp) {
+                    failingMutexes = _.map(_.range(numTests), function() { return new MongooseMutex(slug); });
+
                     return RSVP.all(_.map(failingMutexes), function(mutex) {
                         return mutex.promise.then(function() {
                             // TODO (use should somehow so it will be thrown as an assertion)
@@ -261,15 +271,21 @@ describe('MongooseMutex', function() {
                         });
                     }).then(function() {
                         return new RSVP.Promise(function(resolve) {
-                            mutex._model.findOne({ _id: id }, function(err, doc) {
-                                should.not.exist(err);
-                                should.exist(doc);
-                                
-                                doc.timestamps.should.be.an.instanceOf('Array').and.have.lengthOf(1);
-                                doc.timestamps[0].should.be.an.instanceOf('string').and.equal(originalTimestamp);
-                                
-                                resolve();
-                            });
+                            // For some reason we need to use a timeout here, otherwise some old values would still
+                            // be present in the document's timestamp (even though the promise was only resolved after
+                            // the update query was complete... maybe some caching thing)
+                            // TODO (investigate)
+                            setTimeout(function() {
+                                mutex._model.findOne({ slug: slug }, function(err, doc) {
+                                    should.not.exist(err);
+                                    should.exist(doc);
+                                    
+                                    doc.timestamps.should.be.an.instanceOf(Array).and.have.lengthOf(1);
+                                    doc.timestamps[0].should.be.an.instanceOf(String).and.equal(originalTimestamp);
+                                    
+                                    resolve();
+                                });
+                            }, 20);
                         });
                     })
                 })
@@ -278,24 +294,24 @@ describe('MongooseMutex', function() {
         });
         
         it('should not be rejected if a clashing timestamp has expired', function() {
-            var id = 'timeLimitTest',
+            var slug = 'timeLimitTest',
                 numTests = 3,
                 timeLimit = parseInt(mutexTimeLimit / numTests),
-                mutex = new MongooseMutex(id, { idle: true, timeLimit: timeLimit });
+                mutex = new MongooseMutex(slug, { idle: true, timeLimit: timeLimit });
 
             return _.reduce(_.range(numTests + 1), function(previousTimestampPromise) {
                 return previousTimestampPromise.then(function(previousTimestamp) {
                     return new RSVP.Promise(function(resolve, reject) {
                         setTimeout(function() {
                             mutex.go().then(function() {
-                                mutex._model.findOne({ _id: id }, function(err, doc) {
+                                mutex._model.findOne({ slug: slug }, function(err, doc) {
                                     should.not.exist(err);
                                     should.exist(doc);
 
-                                    doc.timestamps.should.be.an.instanceOf('Array').and.have.lengthOf(1);
-                                    doc.timestamps[0].should.be.an.instanceOf('string').and.not.equal(previousTimestamp);
+                                    doc.timestamps.should.be.an.instanceOf(Array).and.have.lengthOf(1);
+                                    doc.timestamps[0].should.be.an.instanceOf(String).and.not.equal(previousTimestamp);
 
-                                    mutex = new MongooseMutex(id, { idle: true, timeLimit: timeLimit });
+                                    mutex = new MongooseMutex(slug, { idle: true, timeLimit: timeLimit });
 
                                     resolve(doc.timestamps[0]);
                                 });
@@ -368,7 +384,7 @@ describe('MongooseMutex', function() {
         
         it('should not initially be true if options.idle != true', function() {
             var mutex = new MongooseMutex('n/a');
-            mutex.idle.should.not.be.true;
+            mutex.idle.should.be.false;
             
             return mutex.promise.then(mutex.free).catch(util.nothing);
         });

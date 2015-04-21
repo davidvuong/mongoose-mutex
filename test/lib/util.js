@@ -17,7 +17,7 @@ var m = {
         if(isAssertionError(err))
             throw err;
         
-        throw new Error('Error caught when working the mutex: ' + JSON.stringify(err));
+        throw new Error('Error caught when working the mutex: ' + err.toString());
     }
 };
 
