@@ -285,7 +285,7 @@ describe('MongooseMutex', function() {
                                     
                                     resolve();
                                 });
-                            }, 20);
+                            }, 100);
                         });
                     })
                 })
