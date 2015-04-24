@@ -10,32 +10,6 @@ var mutexTimeLimit = 1000;
 
 mongoose.connect('mongodb://localhost/test');
 
-/*
-    MongooseMutex.default = {
-        connection: undefined,
-        idle: false,
-        timeLimit: 15000
-    }
-
-Modify this object at your will.
-
-All new instances will copy those defaults to various instance variables (see
-below), but can be modified individually via the options parameter during
-construction. They should NOT be modified after that - consider them read only.
-
-Instance variables and methods existing after construction should not be written
-to, and are:
-
-    #go()
-    #free()
-    .timeLimit
-    .idle
-    .promise
-
-    ._connection
-    ._model
-*/
-
 // TODO (wrap all tests in util.allErrors)
 
 describe('MongooseMutex', function() {
@@ -97,17 +71,17 @@ describe('MongooseMutex', function() {
         });
     });
     
-    describe('#go()', function() {
+    describe('#claim()', function() {
         it('should update and return .promise', function() {
             var mutex = new MongooseMutex('n/a', { idle: true });
             
-            var promise = mutex.go();
+            var promise = mutex.claim();
             promise.should.equal(mutex.promise);
 
             return promise
                 .then(mutex.free)
                 .then(function() {
-                    promise = mutex.go();
+                    promise = mutex.claim();
                     promise.should.equal(mutex.promise);
 
                     return promise.then(mutex.free).catch(util.nothing);
@@ -150,7 +124,7 @@ describe('MongooseMutex', function() {
             var promise = RSVP.resolve();
             for(var i = numTests; i != 0; --i) {
                 promise = promise
-                    .then(mutex.go)
+                    .then(mutex.claim)
                     .then(checkMutex)
                     .then(i === 1
                         ? function() { return mutex.free().catch(util.nothing); }
@@ -303,7 +277,7 @@ describe('MongooseMutex', function() {
                 return previousTimestampPromise.then(function(previousTimestamp) {
                     return new RSVP.Promise(function(resolve, reject) {
                         setTimeout(function() {
-                            mutex.go().then(function() {
+                            mutex.claim().then(function() {
                                 mutex._model.findOne({ slug: slug }, function(err, doc) {
                                     should.not.exist(err);
                                     should.exist(doc);
@@ -327,15 +301,15 @@ describe('MongooseMutex', function() {
             
             var checkThrow = function() {
                 (function() {
-                    mutex.go();
-                }).should.throw('Cannot go when not idle');
+                    mutex.claim();
+                }).should.throw('Cannot claim when not idle');
             };
             checkThrow();
             
             mutex.promise
                 .then(mutex.free)
                 .then(function() {
-                    mutex.go();
+                    mutex.claim();
                     checkThrow();
                     
                     return mutex.promise
@@ -369,7 +343,7 @@ describe('MongooseMutex', function() {
             };
             checkThrow();
             
-            mutex.go()
+            mutex.claim()
                 .then(mutex.free)
                 .then(checkThrow)
                 .catch(util.allErrors);
@@ -389,10 +363,10 @@ describe('MongooseMutex', function() {
             return mutex.promise.then(mutex.free).catch(util.nothing);
         });
         
-        it('should be correct before and after #go() and #free() if options.idle == true', function() {
+        it('should be correct before and after #claim() and #free() if options.idle == true', function() {
             var mutex = new MongooseMutex('n/a', { idle: true });
             
-            mutex.go();
+            mutex.claim();
             mutex.idle.should.be.false;
             
             return mutex.promise

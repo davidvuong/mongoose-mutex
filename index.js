@@ -33,19 +33,19 @@ module.exports = (function() {
         this.idle = true;
 
         // I had to declare instance methods in the constructor as opposed to the prototype because
-        // the value for `this` was `GLOBAL` when called like `x.then(y).then(mutex.go).then(mutex.free)` :(
+        // the value for `this` was `GLOBAL` when called like `x.then(y).then(mutex.claim).then(mutex.free)` :(
         // TODO (investigate)
         var self = this;
-        // ## #go()
-        this.go = function() {
+        // ## #claim()
+        this.claim = function() {
             if(!self.idle)
-                throw new Error('Cannot go when not idle');
+                throw new Error('Cannot claim when not idle');
 
             self.idle = false;
 
             self.promise = new RSVP.Promise(function(outerResolve, outerReject) {
                 // We use a nested promise so error handling  won't affect any promises the user might've prepended
-                // i.e. if the user said `x.then(y).then(z).then(mutex.go)`, `mutex.go` would evaluate to a promise
+                // i.e. if the user said `x.then(y).then(z).then(mutex.claim)`, `mutex.claim` would evaluate to a promise
                 // which would catch things from `x`, `y` and `z` - that's bad!
                 return new RSVP.Promise(function(resolve, reject) {
                     function fail(msg) { reject(new Error(msg)); }
@@ -140,7 +140,7 @@ module.exports = (function() {
         };
 
         if(!options.idle)
-            this.go();
+            this.claim();
     }
 
     MongooseMutex.default = {
