@@ -20,7 +20,7 @@ Interaction with this module is done via A+ conformant promises. The RSVP module
     // Provide a mongoose connection - it should be active and ready to go
     MongooseMutex.default.connection = mongoose;
 
-    new MongooseMutex('doctorSignOff')
+    new MongooseMutex('doctorSignOff').promise
         .then(function(free) {
             // Check if enough doctors are in office
             // Approve sign off if clear
