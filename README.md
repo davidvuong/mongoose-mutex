@@ -1,7 +1,7 @@
 mongoose-mutex
 ==============
 
-Version: 0.1.0
+Version: 0.1.1
 
 Easily acquire arbitrary mutual exclusions via your mongoose connections. They're logical mutexes, not object locks.
 Interaction with this module is done via A+ conformant promises. The RSVP module was used, so their promises will be returned.

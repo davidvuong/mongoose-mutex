@@ -1,6 +1,6 @@
 {
   "name": "mongoose-mutex",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Easily acquire arbitrary mutual exclusions via your mongoose connections. They're logical mutexes, not object locks.",
   "main": "index.js",
   "scripts": {
