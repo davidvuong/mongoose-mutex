@@ -33,7 +33,7 @@ module.exports = (function() {
         this.idle = true;
 
         // I had to declare instance methods in the constructor as opposed to the prototype because
-        // the value for `this` was `GLOBAL` when called like `x.then(y).then(mutex.claim).then(mutex.free)` :(
+        // the value for `this` was `GLOBAL` when called like `x.then(y).then(mutex.claim).then(mutex.free)`. :(
         // TODO (investigate)
         var self = this;
         // ## #claim()
@@ -44,7 +44,7 @@ module.exports = (function() {
             self.idle = false;
 
             self.promise = new RSVP.Promise(function(outerResolve, outerReject) {
-                // We use a nested promise so error handling  won't affect any promises the user might've prepended
+                // We use a nested promise so error handling won't affect any promises the user might've prepended,
                 // i.e. if the user said `x.then(y).then(z).then(mutex.claim)`, `mutex.claim` would evaluate to a promise
                 // which would catch things from `x`, `y` and `z` - that's bad!
                 return new RSVP.Promise(function(resolve, reject) {
@@ -111,7 +111,7 @@ module.exports = (function() {
                     self.idle = true;
 
                     // Throwing the error somehow doesn't result in the promise being rejected...
-                    // Try changing this to throw and running the test suite again - there were timeouts for me :/
+                    // Try changing this to throw and running the test suite again - there were timeouts for me. :/
                     outerReject(err);
                 });
             });
