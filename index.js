@@ -33,7 +33,7 @@ module.exports = (function() {
         this.idle = true;
 
         // I had to declare instance methods in the constructor as opposed to the prototype because
-        // the value for `this` was `GLOBAL` when called like `x.then(y).then(mutex.claim).then(mutex.free)` :(
+        // the value for `this` was `GLOBAL` when called like `x.then(y).then(mutex.claim).then(mutex.free)`. :(
         // TODO (investigate)
         var self = this;
         // ## #claim()
@@ -43,76 +43,80 @@ module.exports = (function() {
 
             self.idle = false;
 
-            self.promise = new RSVP.Promise(function(outerResolve, outerReject) {
-                // We use a nested promise so error handling  won't affect any promises the user might've prepended
-                // i.e. if the user said `x.then(y).then(z).then(mutex.claim)`, `mutex.claim` would evaluate to a promise
-                // which would catch things from `x`, `y` and `z` - that's bad!
-                return new RSVP.Promise(function(resolve, reject) {
-                    function fail(msg) { reject(new Error(msg)); }
+            // Return whichever promise type the user desires but stick to our own so we can use all its features.
+            // A+ conformant promises are expected to have a resolve and reject function, so that's what we'll take advantage of.
+            self.promise = options.promiseType.resolve().then(function() {
+                return new RSVP.Promise(function(outerResolve, outerReject) {
+                    // We use a nested promise so error handling won't affect any promises the user might've prepended,
+                    // i.e. if the user said `x.then(y).then(z).then(mutex.claim)`, `mutex.claim` would evaluate to a promise
+                    // which would catch things from `x`, `y` and `z` - that's bad!
+                    return new RSVP.Promise(function(resolve, reject) {
+                        function fail(msg) { reject(new Error(msg)); }
 
-                    var now = _.now();
-                    // Timestamps are formatted as `"12345-146238912"` (where 12345 is a random integer. The second
-                    // part (after the hyfen) is a unix timestamp, after which the mutex is considered expired.
-                    var time = now + self.timeLimit;
-                    var rand = parseInt(Math.random() * 1000000);
-                    var stamp = rand + '-' + time;
+                        var now = _.now();
+                        // Timestamps are formatted as `"12345-146238912"` (where 12345 is a random integer. The second
+                        // part (after the hyfen) is a unix timestamp, after which the mutex is considered expired.
+                        var time = now + self.timeLimit;
+                        var rand = parseInt(Math.random() * 1000000);
+                        var stamp = rand + '-' + time;
 
-                    // The upsert option makes it possible to atomically update a document, or create it if it doesn't
-                    // exist. We'll take advantage of that here. However, `findOneAndUpdate` doesn't seem to return the
-                    // document if it was upserted, so we need to manually search for it.
-                    // TODO (verify)
-                    self._model.update({ slug: self._slug }, { slug: self._slug, $push: { timestamps: stamp } }, { upsert: true }, function(err) {
-                        if(err)
-                            return fail('Database error: ' + JSON.stringify(err));
-
-                        self._model.findOne({ slug: self._slug }, function(err, doc) {
+                        // The upsert option makes it possible to atomically update a document, or create it if it doesn't
+                        // exist. We'll take advantage of that here. However, `findOneAndUpdate` doesn't seem to return the
+                        // document if it was upserted, so we need to manually search for it.
+                        // TODO (verify)
+                        self._model.update({ slug: self._slug }, { slug: self._slug, $push: { timestamps: stamp } }, { upsert: true }, function(err) {
                             if(err)
                                 return fail('Database error: ' + JSON.stringify(err));
-                            
-                            if(!doc)
-                                return fail('Database error: document not returned');
 
-                            // We fail to acquire mutual exlusion IFF there exists a timestamp (other than our own) that
-                            // has NOT expired yet. If we successfully acquire mutual exclusion, we should remove all
-                            // old, expired timestamps if they exist. This will prevent cluttering if a programming error
-                            // results in mutexes never being `#free()`d.
-                            var toRemove = [];
-                            var allGood = true;
-                            _.forEach(doc.timestamps, function(otherStamp) {
-                                if(!allGood || stamp === otherStamp)
-                                    return;
+                            self._model.findOne({ slug: self._slug }, function(err, doc) {
+                                if(err)
+                                    return fail('Database error: ' + JSON.stringify(err));
+                                
+                                if(!doc)
+                                    return fail('Database error: document not returned');
 
-                                var split = otherStamp.split('-');
-                                var otherTime = parseInt(split[1]);
+                                // We fail to acquire mutual exlusion IFF there exists a timestamp (other than our own) that
+                                // has NOT expired yet. If we successfully acquire mutual exclusion, we should remove all
+                                // old, expired timestamps if they exist. This will prevent cluttering if a programming error
+                                // results in mutexes never being `#free()`d.
+                                var toRemove = [];
+                                var allGood = true;
+                                _.forEach(doc.timestamps, function(otherStamp) {
+                                    if(!allGood || stamp === otherStamp)
+                                        return;
 
-                                if(now <= otherTime)
-                                    allGood = false;
-                                else
-                                    toRemove.push(otherStamp);
-                            });
+                                    var split = otherStamp.split('-');
+                                    var otherTime = parseInt(split[1]);
 
-                            if(!allGood)
-                                toRemove = [stamp];
-
-                            if(toRemove.length != 0) {
-                                doc.update({ $pullAll: { timestamps: toRemove } }, function() {
-                                    if(allGood)
-                                        resolve();
+                                    if(now <= otherTime)
+                                        allGood = false;
                                     else
-                                        fail('Failed to acquire mutual exclusion');
+                                        toRemove.push(otherStamp);
                                 });
-                            } else
-                                resolve();
-                        });
-                    });
-                }).then(function() {
-                    outerResolve(self.free);
-                }, function(err) {
-                    self.idle = true;
 
-                    // Throwing the error somehow doesn't result in the promise being rejected...
-                    // Try changing this to throw and running the test suite again - there were timeouts for me :/
-                    outerReject(err);
+                                if(!allGood)
+                                    toRemove = [stamp];
+
+                                if(toRemove.length != 0) {
+                                    doc.update({ $pullAll: { timestamps: toRemove } }, function() {
+                                        if(allGood)
+                                            resolve();
+                                        else
+                                            fail('Failed to acquire mutual exclusion');
+                                    });
+                                } else
+                                    resolve();
+                            });
+                        });
+                    }).then(function() {
+                        outerResolve(self.free);
+                    }, function(err) {
+                        self.idle = true;
+
+                        // Throwing the error somehow doesn't result in the promise being rejected...
+                        // Try changing this to throw and running the test suite again - there were timeouts for me. :/
+                        outerReject(err);
+                    });
                 });
             });
 
@@ -144,9 +148,10 @@ module.exports = (function() {
     }
 
     MongooseMutex.default = {
-        connection: undefined,
-        idle: false,
-        timeLimit: 15000
+        connection: undefined
+      , idle: false
+      , timeLimit: 15000
+      , promiseType: RSVP.Promise
     };
 
     return MongooseMutex;

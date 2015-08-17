@@ -4,7 +4,8 @@ mongoose-mutex
 Version: 0.1.1
 
 Easily acquire arbitrary mutual exclusions via your mongoose connections. They're logical mutexes, not object locks.
-Interaction with this module is done via A+ conformant promises. The RSVP module was used, so their promises will be returned.
+Interaction with this module is done via A+ conformant promises.
+The RSVP module was used, so their promises will be returned, but this can easily be configured (see `options.promiseType`).
 
 ## Installation
 
@@ -194,6 +195,22 @@ the time limit doesn't start ticking once `mutex.promise` is resolved, but rathe
 `#claim()` is called. You should be careful with small limits as delays between your Node and
 Mongo servers could use up a good deal of the time limit.
 
+##### options.promiseType
+
+By default, RSVP is used:
+
+    MongooseMutex.default.promiseType === RSVP.Promise; // true
+
+Using your prefered promise class is simple,
+and can be done on individual basis (which is kind of strange),
+or set as the default:
+
+    var Bluebird = require('bluebird');
+
+    MongooseMutex.default.promiseType = Bluebird;
+
+The use of A+ conformant promises is assumed.
+
 ### #claim()
 
 Use this function to launch an attempt to claim mutual exclusion. It will be implicitly called
@@ -273,6 +290,8 @@ It will be set to false once the promise returned by `#free()` is resolved or re
 ### .promise
 
 This is a read only property - do not change the value.
+
+See `options.promiseType` for information regarding the type of promise that is returned.
 
 You should only read this property while `mutex.idle == false`. The value is indeterminate
 before `#claim()` and after `#free()`. This is because the A+ promise specification states

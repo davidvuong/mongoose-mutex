@@ -49,25 +49,49 @@ describe('MongooseMutex', function() {
         });
 
         it('should take values from MongooseMutex.default which can be overridden individually', function() {
-            var weirdTimeLimit = 10;
+            var slug = 'defaultTest'
+              , weirdTimeLimit = 10
+              , promiseType = require('bluebird')
+              ;
+
+            var defaults = _.clone(MongooseMutex.default);
 
             MongooseMutex.default.idle = true;
             MongooseMutex.default.timeLimit = weirdTimeLimit;
+            MongooseMutex.default.promiseType = promiseType;
 
-            var mutex = new MongooseMutex('n/a');
-            mutex.idle.should.be.true;
-            mutex.timeLimit.should.equal(weirdTimeLimit);
+            var promises = [];
 
-            // These defaults will affect all tests, so we'll set them to good values.
-            MongooseMutex.default.idle = false;
-            MongooseMutex.default.timeLimit = mutexTimeLimit;
+            try {
+                var mutexA = new MongooseMutex(slug + 'a');
+                mutexA.idle.should.be.true;
+                mutexA.timeLimit.should.equal(weirdTimeLimit);
+                mutexA.claim();
+                mutexA.promise.should.be.instanceOf(promiseType);
+                promises.push(mutexA.free().catch(util.nothing));
+            } catch(err) {
+                throw err;
+            } finally {
+                // If the defaults are changed then tests may need to be adjusted - be prepared.
+                MongooseMutex.default = defaults;
+                // Set the defaults to what's preferable for testing here.
+                MongooseMutex.default.timeLimit = mutexTimeLimit;
+            }
 
-            var mutex = new MongooseMutex('n/a', { idle: true });
-            mutex.idle.should.be.true;
-            mutex.timeLimit.should.equal(mutexTimeLimit);
+            var mutexB = new MongooseMutex(slug + 'b');
+            mutexB.idle.should.be.false;
+            mutexB.timeLimit.should.equal(mutexTimeLimit);
+            mutexB.promise.should.be.instanceOf(RSVP.Promise);
+            promises.push(mutexB.free().catch(util.nothing));
 
-            var mutex = new MongooseMutex('n/a', { idle: true, timeLimit: weirdTimeLimit });
-            mutex.timeLimit.should.equal(weirdTimeLimit);
+            var mutexC = new MongooseMutex(slug + 'c', { idle: true, timeLimit: weirdTimeLimit, promiseType: promiseType });
+            mutexC.idle.should.be.true;
+            mutexC.timeLimit.should.equal(weirdTimeLimit);
+            mutexC.claim();
+            mutexC.promise.should.be.instanceOf(promiseType);
+            promises.push(mutexC.free().catch(util.nothing));
+
+            return RSVP.all(promises);
         });
     });
     
@@ -167,7 +191,7 @@ describe('MongooseMutex', function() {
                 mutexPromises = _.map(_.range(numMutexes), function(delay) {
                     return new RSVP.Promise(function(resolve) {
                         // A delay must be used because if they all happen 'simultaneously' (or immediately after
-                        // one another) then they may all use the same time and all be rejected
+                        // one another) then they may all use the same time and all be rejected.
                         setTimeout(function() {
                             resolve(new MongooseMutex(slug));
                         }, delay * 5);
@@ -247,7 +271,7 @@ describe('MongooseMutex', function() {
                         return new RSVP.Promise(function(resolve) {
                             // For some reason we need to use a timeout here, otherwise some old values would still
                             // be present in the document's timestamp (even though the promise was only resolved after
-                            // the update query was complete... maybe some caching thing)
+                            // the update query was complete... maybe some caching thing).
                             // TODO (investigate)
                             setTimeout(function() {
                                 mutex._model.findOne({ slug: slug }, function(err, doc) {
@@ -290,7 +314,7 @@ describe('MongooseMutex', function() {
                                     resolve(doc.timestamps[0]);
                                 });
                             }).catch(reject);
-                        }, previousTimestamp ? timeLimit : 0); // Don't timeout if it's the first mutex (i.e. previousTimestamp === null)
+                        }, previousTimestamp ? timeLimit : 0); // Don't timeout if it's the first mutex (i.e. previousTimestamp === null).
                     });
                 });
             }, RSVP.resolve()).catch(util.allErrors);
