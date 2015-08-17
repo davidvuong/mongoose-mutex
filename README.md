@@ -205,9 +205,9 @@ Using your prefered promise class is simple,
 and can be done on individual basis (which is kind of strange),
 or set as the default:
 
-    var Q = require('q');
+    var Bluebird = require('bluebird');
 
-    MongooseMutex.default.promiseType = Q;
+    MongooseMutex.default.promiseType = Bluebird;
 
 The use of A+ conformant promises is assumed.
 

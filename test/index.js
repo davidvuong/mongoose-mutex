@@ -51,7 +51,7 @@ describe('MongooseMutex', function() {
         it('should take values from MongooseMutex.default which can be overridden individually', function() {
             var slug = 'defaultTest'
               , weirdTimeLimit = 10
-              , promiseType = require('q')
+              , promiseType = require('bluebird')
               ;
 
             var defaults = _.clone(MongooseMutex.default);
