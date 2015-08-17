@@ -1,11 +1,11 @@
 mongoose-mutex
 ==============
 
-Version: 0.2.0
+Version: 0.2.1
 
 Easily acquire arbitrary mutual exclusions via your mongoose connections. They're logical mutexes, not object locks.
-Interaction with this module is done via A+ conformant promises.
-The RSVP module was used, so their promises will be returned, but this can easily be configured (see `options.promiseType`).
+Interaction with this module is done via [A+ conformant promises](https://promisesaplus.com).
+The [RSVP](https://www.npmjs.com/package/rsvp) module was used, so their promises will be returned, but this can easily be configured (see `options.promiseType`).
 
 ## Installation
 
@@ -188,7 +188,7 @@ should adjust this limit appropriately.
 Note that this should be considered an upper bound for the time a task may take - you should not
 risk having a task still underway when the time limit is reached, as then another mutex may be
 granted access and you'll have two instances of that task being run simultaneously, which
-removes the point of using the mutex entirely. See the caveats section for more details.
+removes the point of using the mutex entirely.
 
 Also note that the time taken to claim mutual exclusion is INCLUDED in the time limit. That is,
 the time limit doesn't start ticking once `mutex.promise` is resolved, but rather when
@@ -197,7 +197,7 @@ Mongo servers could use up a good deal of the time limit.
 
 ##### options.promiseType
 
-By default, RSVP is used:
+By default, [RSVP](https://www.npmjs.com/package/rsvp) is used:
 
     MongooseMutex.default.promiseType === RSVP.Promise; // true
 
@@ -209,7 +209,7 @@ or set as the default:
 
     MongooseMutex.default.promiseType = Bluebird;
 
-The use of A+ conformant promises is assumed.
+The use of [A+ conformant promises](https://promisesaplus.com) is assumed.
 
 ### #claim()
 
@@ -293,11 +293,10 @@ This is a read only property - do not change the value.
 
 See `options.promiseType` for information regarding the type of promise that is returned.
 
-You should only read this property while `mutex.idle == false`. The value is indeterminate
-before `#claim()` and after `#free()`. This is because the A+ promise specification states
-that promises can only be resolved or rejected once. As such, a new promise must be used
-each time `#claim()` is called and therefore this property must be assigned a new value
-each time:
+You should only read this property while `mutex.idle == false`.
+The value is indeterminate before `#claim()` and after `#free()`.
+This is because the [A+ promise specification](https://promisesaplus.com) states that promises can only be resolved or rejected once.
+As such, a new promise must be used each time `#claim()` is called and therefore this property must be assigned a new value each time:
 
     var mutex = new MongooseMutex('slug6');
 
@@ -358,17 +357,19 @@ in this case, and things can go off the rails for you.
 It is assumed that you've considered the needs of your critical code section and have
 selected an appropriate limit that will ensure the mutex will be freed before it expires.
 
+See `options.timeLimit` for more information.
+
 ### Failing to free
 
 A record is created in the database when a mutex is claimed. That record is removed once
 freed to avoid gradual clutter of the database. This is necessary when considering large
-scale applications which may have multiple uses of mutexes which use IDs as part of the
-slug - billions of records may pile up.
+scale applications which, for example, may use IDs as part of the slug.
+Without removing the record once freed, billions of records may eventually pile up.
 
-However as a result, if you fail to free a mutex, it will remain in the database until
-claimed and freed again. This is only problematic if you fail to free the mutex often -
-the aforementioned clutter will again occur. You should have some form of monitoring in
-place such to notice if failures are occurring often.
+However if you fail to free a mutex, its record will remain in the database until later claimed and freed.
+This is only problematic if you fail to free the mutex often,
+as the aforementioned clutter may again occur.
+If you find this threatening, consider some form of monitoring such to notice if failing often.
 
 ## Tests
 
@@ -385,5 +386,9 @@ Then `cd` into the `mongoose-mutex` directory, `npm install` (without `--product
 
 ## Release history
 
+* 0.2.1
+  * Updated dependencies to latest stable versions.
+* 0.2.0
+  * Addition of `options.promiseType`.
 * 0.1.0
   * Initial release with passing test suite, ready to publish.
