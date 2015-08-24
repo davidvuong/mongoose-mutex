@@ -1,7 +1,7 @@
 mongoose-mutex
 ==============
 
-Version: 0.2.1
+[![npm version](https://badge.fury.io/js/mongoose-mutex.svg)](http://badge.fury.io/js/mongoose-mutex)
 
 Easily acquire arbitrary mutual exclusions via your mongoose connections. They're logical mutexes, not object locks.
 Interaction with this module is done via [A+ conformant promises](https://promisesaplus.com).
@@ -52,7 +52,7 @@ The [RSVP](https://www.npmjs.com/package/rsvp) module was used, so their promise
         idle: true,                     // You can defer execution of the mutex
         timeLimit: 60 * 5 * 1000        // You can change the timeLimit (default 15s)
     });
-    
+
     // If you're going to do this often, you can change the defaults instead
     MongooseMutex.default.idle = true;
     MongooseMutex.default.timeLimit = 60 * 5 * 1000;
